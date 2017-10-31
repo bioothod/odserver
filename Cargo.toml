@@ -1,0 +1,8 @@
+[package]
+name = "odserver"
+version = "0.1.0"
+authors = ["Evgeniy Polyakov <zbr@ioremap.net>"]
+
+[dependencies]
+tensorflow = "*"
+image = "*"
