@@ -111,17 +111,24 @@ fn main() {
                     if file_type.is_file() {
                         let img = image::open(entry.path());
                         if let Ok(img) = img {
-                            let rgb = img.to_rgb();
-                            let sz = rgb.height() * rgb.width() * 3;
-                            let mut t = Tensor::new(&[sz as u64]);
-                            t.copy_from_slice(&rgb.into_raw());
+                            if let Some(rgb) = img.as_rgb8() {
+                                println!("path: {}, color_type: {:?}, dimensions: {:?}",
+                                         entry.path().display(), img.color(), img.dimensions());
 
-                            println!("path: {}, color_type: {:?}, dimensions: {:?}",
-                                     entry.path().display(), img.color(), img.dimensions());
+                                let mut t = Tensor::<u8>::new(&[1, rgb.height() as u64, rgb.width() as u64, 3]);
+                                for (x, y, &p) in rgb.enumerate_pixels() {
+                                    let idx = (y*rgb.width() + x)*3;
+                                    let idx: usize = idx as usize;
 
-                            match gr.step(&t) {
-                                Err(err) => println!("step failed: {}", err),
-                                Ok(res) => println!("result: {:?}", res[0]),
+                                    t[idx + 0] = p.data[0];
+                                    t[idx + 1] = p.data[1];
+                                    t[idx + 2] = p.data[2];
+                                }
+
+                                match gr.step(&t) {
+                                    Err(err) => println!("step failed: {}", err),
+                                    Ok(res) => println!("result: {:?}", res[0]),
+                                }
                             }
                         }
                     }
