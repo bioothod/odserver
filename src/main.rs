@@ -1,18 +1,18 @@
 #![cfg_attr(feature="nightly", feature(alloc_system))]
 #[cfg(feature="nightly")]
 extern crate alloc_system;
+extern crate clap;
 extern crate image;
 extern crate tensorflow;
 
+use clap::{Arg, App};
 use image::GenericImage;
-use std::env;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::result::Result;
 use std::path::Path;
-use std::process;
 use tensorflow::Code;
 //use tensorflow::Graph;
 use tensorflow::ImportGraphDefOptions;
@@ -81,36 +81,47 @@ impl Graph {
 }
 
 fn main() {
-    let filename = "export_model/frozen_inference_graph.pb";
-    //let filename = "examples/addition-model/model.pb";
-    
-    let mut gr = Graph::new(filename).unwrap_or_else(|err| {
-        eprintln!("could not create new graph from {}: {}", filename, err);
-        process::exit(1);
-    });
+    let matches = App::new("Tensorflow object detection server")
+        .arg(Arg::with_name("model")
+                .short("m")
+                .long("model")
+                .required(true)
+                .takes_value(true)
+                .help("tensorflow graph file"))
+        .arg(Arg::with_name("image_dir")
+                .long("image_dir")
+                .takes_value(true)
+                .help("image directory to scan and detect"))
+        .arg(Arg::with_name("threshold")
+                .long("threshold")
+                .takes_value(true)
+                .help("image directory to scan and detect"))
+        .get_matches();
 
-    let mut args = env::args();
-    args.next();
-    for arg in args {
-        if let Ok(entries) = fs::read_dir(arg) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    if let Ok(file_type) = entry.file_type() {
-                        if file_type.is_file() {
-                            let img = image::open(entry.path());
-                            if let Ok(img) = img {
-                                let rgb = img.to_rgb();
-                                let sz = rgb.height() * rgb.width() * 3;
-                                let mut t = Tensor::new(&[sz as u64]);
-                                t.copy_from_slice(&rgb.into_raw());
+    let model_filename = matches.value_of("model").unwrap();
+    let image_dir = matches.value_of("image_dir").unwrap();
+    let threshold = matches.value_of("threshold").unwrap_or("0.9").parse::<f32>();
 
-                                println!("path: {}, color_type: {:?}, dimensions: {:?}",
-                                         entry.path().display(), img.color(), img.dimensions());
+    let mut gr = Graph::new(model_filename).unwrap();
 
-                                match gr.step(&t) {
-                                    Err(err) => println!("step failed: {}", err),
-                                    Ok(res) => println!("result: {:?}", res[0]),
-                                }
+    if let Ok(entries) = fs::read_dir(image_dir) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_file() {
+                        let img = image::open(entry.path());
+                        if let Ok(img) = img {
+                            let rgb = img.to_rgb();
+                            let sz = rgb.height() * rgb.width() * 3;
+                            let mut t = Tensor::new(&[sz as u64]);
+                            t.copy_from_slice(&rgb.into_raw());
+
+                            println!("path: {}, color_type: {:?}, dimensions: {:?}",
+                                     entry.path().display(), img.color(), img.dimensions());
+
+                            match gr.step(&t) {
+                                Err(err) => println!("step failed: {}", err),
+                                Ok(res) => println!("result: {:?}", res[0]),
                             }
                         }
                     }
