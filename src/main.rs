@@ -10,6 +10,7 @@ use image::GenericImage;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
+use std::io;
 use std::io::Read;
 use std::result::Result;
 use std::path::Path;
@@ -78,6 +79,53 @@ impl Graph {
 
         return Ok(classes.iter().zip(scores.iter()).map(|(&c, &s)| Class::new(c, s)).collect());
     }
+
+    fn process_image(&mut self, threshold: f32, img: &image::DynamicImage) -> Result<Vec<Class>, Box<Error>> {
+        match img.as_rgb8() {
+            None => {
+                Ok(vec!())
+            },
+            Some(rgb) => {
+                let mut t = Tensor::<u8>::new(&[1, rgb.height() as u64, rgb.width() as u64, 3]);
+                for (x, y, &p) in rgb.enumerate_pixels() {
+                    let idx = (y*rgb.width() + x)*3;
+                    let idx: usize = idx as usize;
+
+                    t[idx + 0] = p.data[0];
+                    t[idx + 1] = p.data[1];
+                    t[idx + 2] = p.data[2];
+                }
+
+                let res = self.step(&t)?;
+                let m: Vec<Class> = res.into_iter().filter(|c| c.score >= threshold).collect();
+                Ok(m)
+            }
+        }
+    }
+}
+
+fn parse_file(gr: &mut Graph, threshold: f32, entry: io::Result<fs::DirEntry>) -> Result<(), Box<Error>> {
+    let entry = entry?;
+    let file_type = entry.file_type()?;
+    if !file_type.is_file() {
+        return Ok(());
+    }
+
+    let img = image::open(entry.path())?;
+    let m = gr.process_image(threshold, &img)?;
+    let is_selfie = m.iter().filter(|c| c.class == 6).count() > 0;
+    println!("path: {}, dimensions: {:?}, matches: {:?}, is_selfie: {}",
+             entry.path().display(), img.dimensions(), m, is_selfie);
+
+    Ok(())
+}
+
+fn parse_dir(gr: &mut Graph, threshold: f32, image_dir: &str) -> Result<(), Box<Error>> {
+    for entry in fs::read_dir(image_dir)? {
+        let _ = parse_file(gr, threshold, entry);
+    }
+
+    Ok(())
 }
 
 fn main() {
@@ -99,45 +147,10 @@ fn main() {
         .get_matches();
 
     let model_filename = matches.value_of("model").unwrap();
-    let image_dir = matches.value_of("image_dir").unwrap();
     let threshold = matches.value_of("threshold").unwrap_or("0.8").parse::<f32>().unwrap();
 
     let mut gr = Graph::new(model_filename).unwrap();
-
-    if let Ok(entries) = fs::read_dir(image_dir) {
-        for entry in entries {
-            if let Ok(entry) = entry {
-                if let Ok(file_type) = entry.file_type() {
-                    if file_type.is_file() {
-                        let img = image::open(entry.path());
-                        if let Ok(img) = img {
-                            if let Some(rgb) = img.as_rgb8() {
-                                println!("path: {}, color_type: {:?}, dimensions: {:?}",
-                                         entry.path().display(), img.color(), img.dimensions());
-
-                                let mut t = Tensor::<u8>::new(&[1, rgb.height() as u64, rgb.width() as u64, 3]);
-                                for (x, y, &p) in rgb.enumerate_pixels() {
-                                    let idx = (y*rgb.width() + x)*3;
-                                    let idx: usize = idx as usize;
-
-                                    t[idx + 0] = p.data[0];
-                                    t[idx + 1] = p.data[1];
-                                    t[idx + 2] = p.data[2];
-                                }
-
-                                match gr.step(&t) {
-                                    Err(err) => println!("step failed: {}", err),
-                                    Ok(res) => {
-                                        let m: Vec<&Class> = res.iter().filter(|c| c.score >= threshold).collect();
-                                        let is_selfie = m.iter().filter(|c| c.class == 6).count() > 0;
-                                        println!("result: {:?}, selfie: {}", m, is_selfie)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if let Some(image_dir) = matches.value_of("image_dir") {
+        parse_dir(&mut gr, threshold, image_dir).unwrap();
     }
 }
