@@ -34,9 +34,9 @@ struct Class {
 }
 
 impl Class {
-    fn new(c: i32, s: f32) -> Class {
+    fn new(c: f32, s: f32) -> Class {
         Class {
-            class: c,
+            class: c as i32,
             score: s,
         }
     }
@@ -73,10 +73,10 @@ impl Graph {
         let classes = step.request_output(&self.graph.operation_by_name_required("detection_classes")?, 0);
         self.session.run(&mut step)?;
 
-        let scores = step.take_output(scores)?;
-        let classes = step.take_output(classes)?;
+        let scores = step.take_output::<f32>(scores)?;
+        let classes = step.take_output::<f32>(classes)?;
 
-        return Ok(classes.iter().zip(scores.iter()).map(|(&s, &c)| Class::new(c, s)).collect());
+        return Ok(classes.iter().zip(scores.iter()).map(|(&c, &s)| Class::new(c, s)).collect());
     }
 }
 
@@ -100,7 +100,7 @@ fn main() {
 
     let model_filename = matches.value_of("model").unwrap();
     let image_dir = matches.value_of("image_dir").unwrap();
-    let threshold = matches.value_of("threshold").unwrap_or("0.9").parse::<f32>();
+    let threshold = matches.value_of("threshold").unwrap_or("0.8").parse::<f32>().unwrap();
 
     let mut gr = Graph::new(model_filename).unwrap();
 
@@ -127,7 +127,11 @@ fn main() {
 
                                 match gr.step(&t) {
                                     Err(err) => println!("step failed: {}", err),
-                                    Ok(res) => println!("result: {:?}", res[0]),
+                                    Ok(res) => {
+                                        let m: Vec<&Class> = res.iter().filter(|c| c.score >= threshold).collect();
+                                        let is_selfie = m.iter().filter(|c| c.class == 6).count() > 0;
+                                        println!("result: {:?}, selfie: {}", m, is_selfie)
+                                    }
                                 }
                             }
                         }
