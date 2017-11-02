@@ -64,7 +64,7 @@ fn main() {
     let model_filename = matches.value_of("model").unwrap();
     let threshold = matches.value_of("threshold").unwrap_or("0.8").parse::<f32>().unwrap();
 
-    let mut gr = Graph::new(model_filename).unwrap();
+    let gr = Graph::new(model_filename).unwrap();
     if let Some(image_dir) = matches.value_of("image_dir") {
         parse_dir(&gr, threshold, image_dir).unwrap();
     }
@@ -73,11 +73,10 @@ fn main() {
         let srv = server::Server::new(move |chunk: Chunk| -> Result<Chunk, Box<Error>> {
             let data = chunk.to_vec();
             let img = image::load_from_memory(&data)?;
-            println!("uploaded image, dimensions: {:?}", img.dimensions());
 
-            let _m = (&gr).process_image(threshold, &img)?;
-
-            Ok(Chunk::from("this is a response\n"))
+            let m = (&gr).process_image(threshold, &img)?;
+            let is_selfie = m.iter().filter(|c| c.class == 6).count() > 0;
+            Ok(Chunk::from(format!("dimensions: {:?}, matches: {:?}, is_selfie: {}", img.dimensions(), m, is_selfie)))
         });
         srv.start(addr).unwrap();
     }
