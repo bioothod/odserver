@@ -52,6 +52,8 @@ impl Graph {
         File::open(filename)?.read_to_end(&mut proto)?;
         graph.import_graph_def(&proto, &ImportGraphDefOptions::new())?;
 
+        println!("Graph has been imported from {}", filename);
+
         return Ok(Graph{graph});
     }
 
