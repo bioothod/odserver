@@ -7,3 +7,5 @@ authors = ["Evgeniy Polyakov <zbr@ioremap.net>"]
 tensorflow = "*"
 image = "*"
 clap = "2"
+futures = "0.1.14"
+hyper = "0.11.2"

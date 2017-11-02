@@ -19,7 +19,6 @@ use self::tensorflow::Tensor;
 
 pub struct Graph {
     graph: tensorflow::Graph,
-    session: tensorflow::Session,
 }
 
 #[derive(Debug)]
@@ -53,12 +52,10 @@ impl Graph {
         File::open(filename)?.read_to_end(&mut proto)?;
         graph.import_graph_def(&proto, &ImportGraphDefOptions::new())?;
 
-        let session = Session::new(&SessionOptions::new(), &graph)?;
-
-        return Ok(Graph{graph, session});
+        return Ok(Graph{graph});
     }
 
-    pub fn step<T>(&mut self, img: &Tensor<T>) -> Result<(Vec<Class>), Box<Error>>
+    pub fn step<T>(&self, img: &Tensor<T>) -> Result<(Vec<Class>), Box<Error>>
         where T: tensorflow::TensorType
     {
         let mut step = StepWithGraph::new();
@@ -66,7 +63,8 @@ impl Graph {
         step.add_input(&self.graph.operation_by_name_required("image_tensor")?, 0, img);
         let scores = step.request_output(&self.graph.operation_by_name_required("detection_scores")?, 0);
         let classes = step.request_output(&self.graph.operation_by_name_required("detection_classes")?, 0);
-        self.session.run(&mut step)?;
+
+        Session::new(&SessionOptions::new(), &self.graph)?.run(&mut step)?;
 
         let scores = step.take_output::<f32>(scores)?;
         let classes = step.take_output::<f32>(classes)?;
@@ -74,7 +72,7 @@ impl Graph {
         return Ok(classes.iter().zip(scores.iter()).map(|(&c, &s)| Class::new(c, s)).collect());
     }
 
-    pub fn process_image(&mut self, threshold: f32, img: &image::DynamicImage) -> Result<Vec<Class>, Box<Error>> {
+    pub fn process_image(&self, threshold: f32, img: &image::DynamicImage) -> Result<Vec<Class>, Box<Error>> {
         match img.as_rgb8() {
             None => {
                 Ok(vec!())
