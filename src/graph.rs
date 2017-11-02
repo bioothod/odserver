@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::Read;
 use std::result::Result;
 use std::path::Path;
+use std::time::Instant;
 use self::tensorflow::Code;
 use self::tensorflow::ImportGraphDefOptions;
 use self::tensorflow::Session;
@@ -46,13 +47,16 @@ impl Graph {
                 .unwrap()));
         }
 
+        let now = Instant::now();
         let mut graph = tensorflow::Graph::new();
         
         let mut proto = Vec::new();
         File::open(filename)?.read_to_end(&mut proto)?;
         graph.import_graph_def(&proto, &ImportGraphDefOptions::new())?;
 
-        println!("Graph has been imported from {}", filename);
+        let elapsed = now.elapsed();
+        println!("Graph has been imported from {}, took: {}.{:>0width$}",
+                 filename, elapsed.as_secs(), elapsed.subsec_nanos()/1000000, width=3);
 
         return Ok(Graph{graph});
     }
@@ -66,10 +70,19 @@ impl Graph {
         let scores = step.request_output(&self.graph.operation_by_name_required("detection_scores")?, 0);
         let classes = step.request_output(&self.graph.operation_by_name_required("detection_classes")?, 0);
 
-        Session::new(&SessionOptions::new(), &self.graph)?.run(&mut step)?;
+        let now = Instant::now();
+        let mut s = Session::new(&SessionOptions::new(), &self.graph)?;
+        let cr = now.elapsed();
+        s.run(&mut step)?;
 
         let scores = step.take_output::<f32>(scores)?;
         let classes = step.take_output::<f32>(classes)?;
+
+        let elapsed = now.elapsed();
+        println!("session creation took: {}.{:>0width$}, run took: {}.{:>0width$}",
+                 cr.as_secs(), cr.subsec_nanos()/1000000,
+                 elapsed.as_secs(), elapsed.subsec_nanos()/1000000,
+                 width=3);
 
         return Ok(classes.iter().zip(scores.iter()).map(|(&c, &s)| Class::new(c, s)).collect());
     }
