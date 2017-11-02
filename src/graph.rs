@@ -21,7 +21,7 @@ pub struct Graph {
     graph: tensorflow::Graph,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Class {
     pub class: i32,
     pub score: f32,

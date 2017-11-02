@@ -39,7 +39,7 @@ impl<T> Service for ODServer<T>
                 let c = self.server.clone();
                 Box::new(req.body().concat2().map(move |chunk| {
                         match (c.cb)(chunk) {
-                            Err(error) => Response::new().with_body(format!("there was an error: {}", error)),
+                            Err(error) => Response::new().with_body(format!("there was an error: {}", error)).with_status(StatusCode::InternalServerError),
                             Ok(data) => Response::new().with_body(data),
                         }
                     })

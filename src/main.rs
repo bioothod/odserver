@@ -1,6 +1,11 @@
 extern crate clap;
 extern crate hyper;
 extern crate image;
+extern crate serde;
+extern crate serde_json;
+
+#[macro_use]
+extern crate serde_derive;
 
 use clap::{Arg, App};
 use hyper::Chunk;
@@ -76,7 +81,29 @@ fn main() {
 
             let m = (&gr).process_image(threshold, &img)?;
             let is_selfie = m.iter().filter(|c| c.class == 6).count() > 0;
-            Ok(Chunk::from(format!("dimensions: {:?}, matches: {:?}, is_selfie: {}", img.dimensions(), m, is_selfie)))
+
+            #[derive(Serialize, Deserialize)]
+            struct ReplyDim {
+                width: u32,
+                height: u32,
+            }
+            #[derive(Serialize, Deserialize)]
+            struct Reply {
+                dimensions: ReplyDim,
+                matches: Vec<graph::Class>,
+                is_selfie: bool,
+            }
+
+            let r = Reply {
+                dimensions: ReplyDim {
+                    width: img.width(),
+                    height: img.height(),
+                },
+                matches: m,
+                is_selfie: is_selfie,
+            };
+            let s = serde_json::to_string(&r)?;
+            Ok(Chunk::from(s))
         });
         srv.start(addr).unwrap();
     }
