@@ -8,6 +8,7 @@ use self::hyper::{Method, StatusCode};
 use self::hyper::server::{Http, Request, Response, Service};
 use std::error::Error;
 use std::sync::Arc;
+use serde_json;
 
 pub struct Server<T>
 {
@@ -39,7 +40,21 @@ impl<T> Service for ODServer<T>
                 let c = self.server.clone();
                 Box::new(req.body().concat2().map(move |chunk| {
                         match (c.cb)(chunk) {
-                            Err(error) => Response::new().with_body(format!("there was an error: {}", error)).with_status(StatusCode::InternalServerError),
+                            Err(error) => {
+                                #[derive(Serialize, Deserialize)]
+                                struct ReplyErr {
+                                    error: String,
+                                }
+                                let re = ReplyErr { error: format!("{}", error) };
+                                let r = serde_json::to_string(&re);
+                                let s: String;
+                                match r {
+                                    Err(_) => s = re.error,
+                                    Ok(x) => s = x,
+                                };
+
+                                Response::new().with_body(s).with_status(StatusCode::InternalServerError)
+                            },
                             Ok(data) => Response::new().with_body(data),
                         }
                     })
