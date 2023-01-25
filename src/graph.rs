@@ -71,7 +71,7 @@ impl Graph {
         let classes = step.request_output(&self.graph.operation_by_name_required("detection_classes")?, 0);
 
         let now = Instant::now();
-        let mut s = Session::new(&SessionOptions::new(), &self.graph)?;
+        let s = Session::new(&SessionOptions::new(), &self.graph)?;
         let cr = now.elapsed();
         s.run(&mut step)?;
 
@@ -98,9 +98,9 @@ impl Graph {
                     let idx = (y*rgb.width() + x)*3;
                     let idx: usize = idx as usize;
 
-                    t[idx + 0] = p.data[0];
-                    t[idx + 1] = p.data[1];
-                    t[idx + 2] = p.data[2];
+                    t[idx + 0] = p[0];
+                    t[idx + 1] = p[1];
+                    t[idx + 2] = p[2];
                 }
 
                 let res = self.step(&t)?;
