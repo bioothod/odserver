@@ -9,7 +9,6 @@ extern crate serde_derive;
 
 use clap::{Arg, App};
 use hyper::Chunk;
-use image::GenericImage;
 use std::error::Error;
 use std::fs;
 use std::io;
@@ -19,7 +18,7 @@ use graph::Graph;
 
 mod server;
 
-fn parse_file(gr: &Graph, threshold: f32, entry: io::Result<fs::DirEntry>) -> Result<(), Box<Error>> {
+fn parse_file(gr: &Graph, threshold: f32, entry: io::Result<fs::DirEntry>) -> Result<(), Box<dyn Error>> {
     let entry = entry?;
     let file_type = entry.file_type()?;
     if !file_type.is_file() {
@@ -35,7 +34,7 @@ fn parse_file(gr: &Graph, threshold: f32, entry: io::Result<fs::DirEntry>) -> Re
     Ok(())
 }
 
-fn parse_dir(gr: &Graph, threshold: f32, image_dir: &str) -> Result<(), Box<Error>> {
+fn parse_dir(gr: &Graph, threshold: f32, image_dir: &str) -> Result<(), Box<dyn Error>> {
     for entry in fs::read_dir(image_dir)? {
         let _ = parse_file(gr, threshold, entry);
     }

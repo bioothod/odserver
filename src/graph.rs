@@ -38,7 +38,7 @@ impl Class {
 }
 
 impl Graph {
-    pub fn new(filename: &str) -> Result<Graph, Box<Error>> {
+    pub fn new(filename: &str) -> Result<Graph, Box<dyn Error>> {
         if !Path::new(filename).exists() {
             return Err(Box::new(Status::new_set(Code::NotFound,
                                                 &format!("Run 'python addition.py' to generate {} \
@@ -61,7 +61,7 @@ impl Graph {
         return Ok(Graph{graph});
     }
 
-    pub fn step<T>(&self, img: &Tensor<T>) -> Result<(Vec<Class>), Box<Error>>
+    pub fn step<T>(&self, img: &Tensor<T>) -> Result<Vec<Class>, Box<dyn Error>>
         where T: tensorflow::TensorType
     {
         let mut step = StepWithGraph::new();
@@ -87,7 +87,7 @@ impl Graph {
         return Ok(classes.iter().zip(scores.iter()).map(|(&c, &s)| Class::new(c, s)).collect());
     }
 
-    pub fn process_image(&self, threshold: f32, img: &image::DynamicImage) -> Result<Vec<Class>, Box<Error>> {
+    pub fn process_image(&self, threshold: f32, img: &image::DynamicImage) -> Result<Vec<Class>, Box<dyn Error>> {
         match img.as_rgb8() {
             None => {
                 Ok(vec!())
